@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>카카오톡 AI 기능 데모</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif;
+      background: #f4f5f9;
+      color: #222;
+    }
+    header {
+      background: #3b5998;
+      color: #fff;
+      padding: 14px 24px;
+      font-size: 18px;
+      font-weight: 700;
+    }
+    .container {
+      display: flex;
+      gap: 16px;
+      padding: 16px;
+    }
+    .column {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+      padding: 16px;
+      flex: 1;
+      min-width: 0;
+    }
+    .column h2 {
+      margin-top: 0;
+      font-size: 17px;
+      border-bottom: 1px solid #eee;
+      padding-bottom: 8px;
+      margin-bottom: 12px;
+    }
+    textarea {
+      width: 100%;
+      height: 260px;
+      border-radius: 12px;
+      border: 1px solid #ddd;
+      padding: 10px;
+      resize: vertical;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    button {
+      margin-top: 8px;
+      padding: 8px 16px;
+      border-radius: 999px;
+      border: none;
+      background: #fee500;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    button:hover { filter: brightness(0.95); }
+    .pill {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      background: #f1f3ff;
+      color: #3b55ff;
+      margin-bottom: 6px;
+    }
+    .list {
+      font-size: 13px;
+      max-height: 260px;
+      overflow-y: auto;
+    }
+    .item {
+      border-radius: 10px;
+      background: #f8f9fc;
+      padding: 8px 10px;
+      margin-bottom: 8px;
+    }
+    .item small {
+      display: block;
+      color: #777;
+      margin-top: 2px;
+      font-size: 11px;
+    }
+    .highlight {
+      color: #0054ff;
+      font-weight: 600;
+    }
+    @media (max-width: 900px) {
+      .container { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <header>카카오톡 AI 기능 개선 – 웹 프로토타입 데모</header>
+
+  <div class="container">
+    <!-- 왼쪽: 채팅 입력 -->
+    <section class="column">
+      <h2>채팅 내용 입력</h2>
+      <p style="font-size:12px; color:#555;">
+        예시) 한 줄당 한 메시지처럼 입력해 주세요.<br/>
+        <code>1/30에 롯데월드 갈래?</code><br/>
+        <code>오늘 안에 피드백 꼭 해줘</code><br/>
+        <code>과제 ppt 다시 올릴게</code>
+      </p>
+      <textarea id="chatInput" placeholder="여기에 채팅 로그를 붙여넣으세요."></textarea>
+      <button id="analyzeBtn">AI로 분석하기</button>
+    </section>
+
+    <!-- 가운데: 일정 / 중요 메시지 -->
+    <section class="column">
+      <h2>AI 일정 추천 & 중요 메시지 탐색</h2>
+      <div class="pill">일정 자동 인식</div>
+      <div id="scheduleList" class="list" style="margin-bottom:12px;"></div>
+      <div class="pill">중요 메시지 자동 탐색</div>
+      <div id="importantList" class="list"></div>
+    </section>
+
+    <!-- 오른쪽: 파일 자동 분류 (간단 데모) -->
+    <section class="column">
+      <h2>파일 자동 분류 데모</h2>
+      <p style="font-size:12px; color:#555;">
+        파일명을 쉼표로 구분해서 입력해 주세요.<br/>
+        예) <code>데이터과제1_report.pdf, 동아리회의록.docx, tax_receipt.png</code>
+      </p>
+      <textarea id="fileInput" placeholder="파일명1, 파일명2, ..."></textarea>
+      <button id="fileBtn">파일 분류하기</button>
+      <div id="fileList" class="list" style="margin-top:8px;"></div>
+    </section>
+  </div>
+
+  <script>
+    const IMPORTANT_KEYWORDS = [
+      "마감", "제출", "피드백", "오늘까지", "내일까지",
+      "확인해줘", "확인 부탁", "필수", "중요", "공지"
+    ];
+
+    const datePatterns = [
+      /(\d{1,2})\/(\d{1,2})/g,              // 1/30
+      /(\d{1,2})월\s*(\d{1,2})일?/g         // 1월 30일
+    ];
+
+    function analyzeChat() {
+      const raw = document.getElementById("chatInput").value.trim();
+      const scheduleList = document.getElementById("scheduleList");
+      const importantList = document.getElementById("importantList");
+      scheduleList.innerHTML = "";
+      importantList.innerHTML = "";
+
+      if (!raw) return;
+
+      const lines = raw.split(/\n+/);
+
+      lines.forEach((line, idx) => {
+        const text = line.trim();
+        if (!text) return;
+
+        // 일정 인식
+        let matchedDate = null;
+        for (const pat of datePatterns) {
+          pat.lastIndex = 0;
+          const m = pat.exec(text);
+          if (m) {
+            const month = m[1];
+            const day = m[2];
+            matchedDate = `${month}월 ${day}일`;
+            break;
+          }
+        }
+        if (matchedDate) {
+          const div = document.createElement("div");
+          div.className = "item";
+          div.innerHTML =
+            `<strong class="highlight">${matchedDate}</strong> 일정 후보<br/>` +
+            `<small>메시지 ${idx + 1} : ${escapeHtml(text)}</small>`;
+          scheduleList.appendChild(div);
+        }
+
+        // 중요 메시지 인식
+        const isImportant = IMPORTANT_KEYWORDS.some(kw => text.includes(kw));
+        if (isImportant) {
+          const div = document.createElement("div");
+          div.className = "item";
+          div.innerHTML =
+            `<strong class="highlight">중요 메시지 감지</strong><br/>` +
+            `<small>메시지 ${idx + 1} : ${escapeHtml(text)}</small>`;
+          importantList.appendChild(div);
+        }
+      });
+
+      if (!scheduleList.children.length) {
+        scheduleList.innerHTML = '<div class="item"><small>인식된 일정이 없습니다.</small></div>';
+      }
+      if (!importantList.children.length) {
+        importantList.innerHTML = '<div class="item"><small>중요 메시지로 감지된 항목이 없습니다.</small></div>';
+      }
+    }
+
+    function classifyFiles() {
+      const raw = document.getElementById("fileInput").value.trim();
+      const fileList = document.getElementById("fileList");
+      fileList.innerHTML = "";
+      if (!raw) return;
+
+      const names = raw.split(",").map(s => s.trim()).filter(Boolean);
+
+      names.forEach(name => {
+        const category = classifyFile(name);
+        const div = document.createElement("div");
+        div.className = "item";
+        div.innerHTML =
+          `<strong>${escapeHtml(name)}</strong><br/>` +
+          `<small>분류 결과: <span class="highlight">${category}</span></small>`;
+        fileList.appendChild(div);
+      });
+    }
+
+    function classifyFile(filename) {
+      const name = filename.toLowerCase();
+      if (name.match(/과제|assignment|report|hw/)) return "과제";
+      if (name.match(/회의록|meeting|minutes/)) return "회의록";
+      if (name.match(/영수증|receipt/)) return "영수증";
+      if (name.endsWith(".ppt") || name.endsWith(".pptx")) return "발표자료";
+      if (name.endsWith(".jpg") || name.endsWith(".jpeg") || name.endsWith(".png")) return "이미지";
+      return "기타";
+    }
+
+    function escapeHtml(str) {
+      return str
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    document.getElementById("analyzeBtn").addEventListener("click", analyzeChat);
+    document.getElementById("fileBtn").addEventListener("click", classifyFiles);
+  </script>
+</body>
+</html>
